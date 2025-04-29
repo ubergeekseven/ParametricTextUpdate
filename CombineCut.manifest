@@ -1,0 +1,13 @@
+{
+	"autodeskProduct":	"Fusion",
+	"type":	"addin",
+	"author":	"MichaelDot",
+	"description":	{
+		"":	"Allows choosing components and tools. Tools being the text updated through the parametric text addin or another set of parametric objects that could increase or decrease in count. The other component is the component holding the body to cut the updated text/objects from. "
+	},
+	"version":	"1",
+	"runOnStartup":	false,
+	"supportedOS":	"windows|mac",
+	"editEnabled":	true,
+	"iconFilename":	"AddInIcon.svg"
+}

@@ -9,7 +9,7 @@ ui = app.userInterface
 # Command identity information.
 CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_combineCut'
 CMD_NAME = 'Combine Cut'
-CMD_Description = 'Cuts text from plates'
+CMD_Description = 'Cuts sets of objects within a component from anoter body within a chosen component'
 
 # Specify that the command will be promoted to the panel.
 IS_PROMOTED = True
@@ -81,13 +81,9 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     group = inputs.addGroupCommandInput('pairs_group', 'Plate/Text Pairs')
     group_inputs = group.children
     # Add the first pair
-    group_inputs.addSelectionInput(f'plate_0', 'Plate Component', 'Select the plate component').addSelectionFilter('Occurrences')
-    group_inputs.itemById(f'plate_0').setSelectionLimits(1, 1)
-    group_inputs.addSelectionInput(f'text_0', 'Text Component', 'Select the text component').addSelectionFilter('Occurrences')
-    group_inputs.itemById(f'text_0').setSelectionLimits(1, 1)
-    # Add + and - buttons
+    add_pair_inputs(group_inputs, 0)
+    # Add + button
     inputs.addBoolValueInput('add_pair', 'Add Pair', False, '', False)
-    inputs.addBoolValueInput('remove_pair', 'Remove Pair', False, '', False)
     # Add Save and Load buttons
     inputs.addBoolValueInput('save_pairs', 'Save Pairs', False, '', False)
     inputs.addBoolValueInput('load_pairs', 'Load Pairs', False, '', False)
@@ -100,6 +96,32 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     futil.add_handler(args.command.executePreview, command_preview, local_handlers=local_handlers)
     futil.add_handler(args.command.validateInputs, command_validate_input, local_handlers=local_handlers)
     futil.add_handler(args.command.destroy, command_destroy, local_handlers=local_handlers)
+
+def add_pair_inputs(group_inputs, idx, target_name=None, tool_name=None):
+    """Helper function to add a new pair of inputs"""
+    row = group_inputs.addGroupCommandInput(f'row_{idx}', f'Pair {idx+1}')
+    row.isExpanded = True
+    row_inputs = row.children
+    
+    # Add plate selection
+    plate_input = row_inputs.addSelectionInput(f'plate_{idx}', f'Target Component {idx+1}', 'Select the target component to cut from')
+    plate_input.addSelectionFilter('Occurrences')
+    plate_input.setSelectionLimits(1, 1)
+    if target_name:
+        plate_input.tooltip = f'Select the target component named: {target_name}'
+        plate_input.prompt = f'Saved: {target_name}'
+        # Add read-only text box showing saved name
+        row_inputs.addTextBoxCommandInput(f'target_name_{idx}', '', target_name, 1, True)
+    
+    # Add text selection
+    text_input = row_inputs.addSelectionInput(f'text_{idx}', f'Tool Component {idx+1}', 'Select the tool component with bodies to cut from the target component')
+    text_input.addSelectionFilter('Occurrences')
+    text_input.setSelectionLimits(1, 1)
+    if tool_name:
+        text_input.tooltip = f'Select the tool component named: {tool_name}'
+        text_input.prompt = f'Saved: {tool_name}'
+        # Add read-only text box showing saved name
+        row_inputs.addTextBoxCommandInput(f'tool_name_{idx}', '', tool_name, 1, True)
 
 
 # This event handler is called when the user clicks the OK button in the command dialog or 
@@ -159,36 +181,39 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
     inputs = args.inputs
     group = inputs.itemById('pairs_group')
     if not group:
+        futil.log('No pairs group found')
         return
     group_inputs = group.children
+
+    futil.log(f'Input changed: {changed_input.id} with value: {changed_input.value}')
+
     if changed_input.id == 'add_pair':
         pair_count += 1
         idx = pair_count - 1
-        plate_input = group_inputs.addSelectionInput(f'plate_{idx}', f'Plate Component {idx+1}', 'Select the plate component')
-        plate_input.addSelectionFilter('Occurrences')
-        plate_input.setSelectionLimits(1, 1)
-        group_inputs.addTextBoxCommandInput(f'plate_name_{idx}', '', '', 1, True)
-        text_input = group_inputs.addSelectionInput(f'text_{idx}', f'Text Component {idx+1}', 'Select the text component')
-        text_input.addSelectionFilter('Occurrences')
-        text_input.setSelectionLimits(1, 1)
-        group_inputs.addTextBoxCommandInput(f'text_name_{idx}', '', '', 1, True)
-        changed_input.value = False
-    elif changed_input.id == 'remove_pair' and pair_count > 1:
-        group_inputs.removeById(f'plate_{pair_count-1}')
-        group_inputs.removeById(f'text_{pair_count-1}')
-        pair_count -= 1
+        add_pair_inputs(group_inputs, idx)
         changed_input.value = False
     elif changed_input.id == 'save_pairs':
         changed_input.value = False
         pairs = []
-        for i in range(0, len(group_inputs), 2):
-            plate_input = group_inputs.item(i)
-            text_input = group_inputs.item(i+1)
-            if plate_input.selectionCount == 0 or text_input.selectionCount == 0:
-                continue
-            plate_name = plate_input.selection(0).entity.component.name
-            text_name = text_input.selection(0).entity.component.name
-            pairs.append({"plate": plate_name, "text": text_name})
+        # Use itemsByType to get all group inputs in order
+        for i in range(group_inputs.count):
+            item = group_inputs.item(i)
+            if item.objectType == adsk.core.GroupCommandInput.classType():
+                row_inputs = item.children
+                plate_input = None
+                text_input = None
+                for j in range(row_inputs.count):
+                    child = row_inputs.item(j)
+                    if child.id.startswith('plate_'):
+                        plate_input = child
+                    elif child.id.startswith('text_'):
+                        text_input = child
+                
+                if plate_input and text_input and plate_input.selectionCount > 0 and text_input.selectionCount > 0:
+                    target_name = plate_input.selection(0).entity.component.name
+                    tool_name = text_input.selection(0).entity.component.name
+                    pairs.append({"plate": target_name, "text": tool_name})
+        
         save_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'plate_text_pairs.json')
         with open(save_path, 'w') as f:
             json.dump(pairs, f)
@@ -206,19 +231,11 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
             group_inputs.item(i).deleteMe()
         # Add loaded pairs with tooltips and default text
         for idx, pair in enumerate(pairs):
-            plate_input = group_inputs.addSelectionInput(f'plate_{idx}', f'Plate Component {idx+1}', f'Select the plate component (saved: {pair["plate"]})')
-            plate_input.addSelectionFilter('Occurrences')
-            plate_input.setSelectionLimits(1, 1)
-            plate_input.tooltip = f'Select the plate component named: {pair["plate"]}'
-            plate_input.prompt = f'Saved: {pair["plate"]}'
-            group_inputs.addTextBoxCommandInput(f'plate_name_{idx}', '', pair["plate"], 1, True)
-            text_input = group_inputs.addSelectionInput(f'text_{idx}', f'Text Component {idx+1}', f'Select the text component (saved: {pair["text"]})')
-            text_input.addSelectionFilter('Occurrences')
-            text_input.setSelectionLimits(1, 1)
-            text_input.tooltip = f'Select the text component named: {pair["text"]}'
-            text_input.prompt = f'Saved: {pair["text"]}'
-            group_inputs.addTextBoxCommandInput(f'text_name_{idx}', '', pair["text"], 1, True)
+            add_pair_inputs(group_inputs, idx, pair["plate"], pair["text"])
         pair_count = len(pairs) if pairs else 1
+        if pair_count == 0:  # Ensure at least one pair exists
+            add_pair_inputs(group_inputs, 0)
+            pair_count = 1
         ui.messageBox(f'Loaded {len(pairs)} pairs. Please reselect the components in the UI.')
     elif changed_input.id == 'info':
         changed_input.value = False
@@ -244,17 +261,27 @@ def command_validate_input(args: adsk.core.ValidateInputsEventArgs):
     inputs = args.inputs
     group = inputs.itemById('pairs_group')
     group_inputs = group.children
-    valid = True
-    for idx in range(pair_count):
-        plate_input = group_inputs.itemById(f'plate_{idx}')
-        text_input = group_inputs.itemById(f'text_{idx}')
-        if not plate_input or not text_input:
-            valid = False
-            break
-        if plate_input.selectionCount == 0 or text_input.selectionCount == 0:
-            valid = False
-            break
-    args.areInputsValid = valid
+    
+    # Count valid pairs
+    valid_pairs = 0
+    for i in range(group_inputs.count):
+        item = group_inputs.item(i)
+        if item.objectType == adsk.core.GroupCommandInput.classType():
+            row_inputs = item.children
+            plate_input = None
+            text_input = None
+            for j in range(row_inputs.count):
+                child = row_inputs.item(j)
+                if child.id.startswith('plate_'):
+                    plate_input = child
+                elif child.id.startswith('text_'):
+                    text_input = child
+            
+            if plate_input and text_input and plate_input.selectionCount > 0 and text_input.selectionCount > 0:
+                valid_pairs += 1
+    
+    # At least one valid pair is required
+    args.areInputsValid = valid_pairs > 0
 
 
 # This event handler is called when the command terminates.
