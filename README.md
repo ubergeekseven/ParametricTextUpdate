@@ -25,10 +25,6 @@ This add-in is especially useful for workflows where you need to create signs, s
 ## .env Location
 This project does **not** require a `.env` file for normal operation. If you wish to use environment variables for development or deployment, place your `.env` file in the root directory of the repository. For public publishing, ensure that your `.env` file is **not** committed to the repository (add `.env` to your `.gitignore`).
 
-## Publishing to GitHub
-- Remove any sensitive or personal data before publishing.
-- Add `.env` to your `.gitignore` if you use one.
-- Commit all source files, the `README.md`, and your `plate_text_pairs.json` example (if desired).
 
 ---
 

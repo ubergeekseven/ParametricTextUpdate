@@ -239,7 +239,7 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
         ui.messageBox(f'Loaded {len(pairs)} pairs. Please reselect the components in the UI.')
     elif changed_input.id == 'info':
         changed_input.value = False
-        ui.messageBox('For security and user experience reasons, Fusion 360 does not allow add-ins to automatically select components in the UI.\n\nYou must manually reselect the components for each pair. The saved names are shown to help you choose the correct ones.')
+        ui.messageBox('It is annoying, I know. Fusion 360 does not allow add-ins to automatically select components in the UI.\n\nYou must manually reselect the components for each pair. The saved names are shown to help you choose the correct ones.')
     # Update text boxes when a selection changes
     if changed_input.id.startswith('plate_') or changed_input.id.startswith('text_'):
         # Find the index
