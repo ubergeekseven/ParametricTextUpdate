@@ -128,41 +128,66 @@ def add_pair_inputs(group_inputs, idx, target_name=None, tool_name=None):
 # is immediately called after the created event not command inputs were created for the dialog.
 def command_execute(args: adsk.core.CommandEventArgs):
     futil.log(f'{CMD_NAME} Command Execute Event')
-    inputs = args.command.commandInputs
-    group = inputs.itemById('pairs_group')
-    group_inputs = group.children
-    pairs = []
-    for idx in range(pair_count):
-        plate_input = group_inputs.itemById(f'plate_{idx}')
-        text_input = group_inputs.itemById(f'text_{idx}')
-        if not plate_input or not text_input:
-            continue
-        if plate_input.selectionCount == 0 or text_input.selectionCount == 0:
-            continue
-        plate_occurrence = plate_input.selection(0).entity
-        text_occurrence = text_input.selection(0).entity
-        pairs.append((plate_occurrence, text_occurrence))
-    design = adsk.fusion.FusionDocument.cast(app.activeDocument).design
-    root = design.rootComponent
-    for plate_occurrence, text_occurrence in pairs:
-        plate_component = plate_occurrence.component
-        plate_body = plate_component.bRepBodies.itemByName(plate_component.name)
-        text_component = text_occurrence.component
-        if not plate_body:
-            ui.messageBox(f'Target body "{plate_component.name}" not found')
-            continue
-        if not text_component:
-            ui.messageBox(f'Tool component "{text_component.name}" not found')
-            continue
-        tool_bodies = adsk.core.ObjectCollection.create()
-        for body in text_component.bRepBodies:
-            tool_bodies.add(body)
-        combine_features = root.features.combineFeatures
-        combine_input = combine_features.createInput(plate_body, tool_bodies)
-        combine_input.operation = adsk.fusion.FeatureOperations.CutFeatureOperation
-        combine_input.isKeepToolBodies = True
-        combine_features.add(combine_input)
-    ui.messageBox('Combine/Cut operation completed successfully for all pairs')
+    try:
+        # Get the inputs
+        inputs = args.command.commandInputs
+        group = inputs.itemById('pairs_group')
+        if not group:
+            futil.log('No pairs group found')
+            return
+        group_inputs = group.children
+
+        # Get the current design
+        app = adsk.core.Application.get()
+        design = app.activeProduct
+        root_comp = design.rootComponent
+
+        # Process each pair
+        for i in range(group_inputs.count):
+            item = group_inputs.item(i)
+            if item.objectType == adsk.core.GroupCommandInput.classType():
+                row_inputs = item.children
+                target_input = None
+                tool_input = None
+                for j in range(row_inputs.count):
+                    child = row_inputs.item(j)
+                    if child.id.startswith('plate_'):
+                        target_input = child
+                    elif child.id.startswith('text_'):
+                        tool_input = child
+                
+                if target_input and tool_input and target_input.selectionCount > 0 and tool_input.selectionCount > 0:
+                    target_occ = target_input.selection(0).entity
+                    tool_occ = tool_input.selection(0).entity
+                    
+                    # Get the components
+                    target_comp = target_occ.component
+                    tool_comp = tool_occ.component
+                    
+                    # Get the target body
+                    target_body = target_comp.bRepBodies.itemByName(target_comp.name)
+                    if not target_body:
+                        ui.messageBox(f'Target body "{target_comp.name}" not found')
+                        continue
+                    
+                    # Create collection of tool bodies
+                    tool_bodies = adsk.core.ObjectCollection.create()
+                    for body in tool_comp.bRepBodies:
+                        tool_bodies.add(body)
+                    
+                    # Create combine feature
+                    combine_features = root_comp.features.combineFeatures
+                    combine_input = combine_features.createInput(target_body, tool_bodies)
+                    combine_input.operation = adsk.fusion.FeatureOperations.CutFeatureOperation
+                    combine_input.isKeepToolBodies = True
+                    combine_features.add(combine_input)
+                    
+                    futil.log(f'Created combine feature for {target_comp.name} and {tool_comp.name}')
+        
+        ui.messageBox('Operation completed successfully.')
+    except Exception as e:
+        futil.log(f'Error in command execution: {str(e)}')
+        ui.messageBox(f'Error: {str(e)}')
 
 
 # This event handler is called when the command needs to compute a new preview in the graphics window.
