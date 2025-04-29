@@ -9,7 +9,7 @@ ui = app.userInterface
 # Command identity information.
 CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_combineCut'
 CMD_NAME = 'Combine Cut'
-CMD_Description = 'Cuts tool components from target components'
+CMD_Description = 'Cuts text from plates'
 
 # Specify that the command will be promoted to the panel.
 IS_PROMOTED = True
@@ -78,15 +78,16 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
     # https://help.autodesk.com/view/fusion360/ENU/?contextId=CommandInputs
     inputs = args.command.commandInputs
-    group = inputs.addGroupCommandInput('pairs_group', 'Target/Tool Pairs')
+    group = inputs.addGroupCommandInput('pairs_group', 'Plate/Text Pairs')
     group_inputs = group.children
     # Add the first pair
-    group_inputs.addSelectionInput(f'plate_0', 'Target Component', 'Select the target component').addSelectionFilter('Occurrences')
+    group_inputs.addSelectionInput(f'plate_0', 'Plate Component', 'Select the plate component').addSelectionFilter('Occurrences')
     group_inputs.itemById(f'plate_0').setSelectionLimits(1, 1)
-    group_inputs.addSelectionInput(f'text_0', 'Tool Component', 'Select the tool component').addSelectionFilter('Occurrences')
+    group_inputs.addSelectionInput(f'text_0', 'Text Component', 'Select the text component').addSelectionFilter('Occurrences')
     group_inputs.itemById(f'text_0').setSelectionLimits(1, 1)
-    # Add + button
+    # Add + and - buttons
     inputs.addBoolValueInput('add_pair', 'Add Pair', False, '', False)
+    inputs.addBoolValueInput('remove_pair', 'Remove Pair', False, '', False)
     # Add Save and Load buttons
     inputs.addBoolValueInput('save_pairs', 'Save Pairs', False, '', False)
     inputs.addBoolValueInput('load_pairs', 'Load Pairs', False, '', False)
@@ -163,14 +164,19 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
     if changed_input.id == 'add_pair':
         pair_count += 1
         idx = pair_count - 1
-        plate_input = group_inputs.addSelectionInput(f'plate_{idx}', f'Target Component {idx+1}', 'Select the target component')
+        plate_input = group_inputs.addSelectionInput(f'plate_{idx}', f'Plate Component {idx+1}', 'Select the plate component')
         plate_input.addSelectionFilter('Occurrences')
         plate_input.setSelectionLimits(1, 1)
         group_inputs.addTextBoxCommandInput(f'plate_name_{idx}', '', '', 1, True)
-        text_input = group_inputs.addSelectionInput(f'text_{idx}', f'Tool Component {idx+1}', 'Select the tool component')
+        text_input = group_inputs.addSelectionInput(f'text_{idx}', f'Text Component {idx+1}', 'Select the text component')
         text_input.addSelectionFilter('Occurrences')
         text_input.setSelectionLimits(1, 1)
         group_inputs.addTextBoxCommandInput(f'text_name_{idx}', '', '', 1, True)
+        changed_input.value = False
+    elif changed_input.id == 'remove_pair' and pair_count > 1:
+        group_inputs.removeById(f'plate_{pair_count-1}')
+        group_inputs.removeById(f'text_{pair_count-1}')
+        pair_count -= 1
         changed_input.value = False
     elif changed_input.id == 'save_pairs':
         changed_input.value = False
@@ -200,23 +206,23 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
             group_inputs.item(i).deleteMe()
         # Add loaded pairs with tooltips and default text
         for idx, pair in enumerate(pairs):
-            plate_input = group_inputs.addSelectionInput(f'plate_{idx}', f'Target Component {idx+1}', f'Select the target component (saved: {pair["plate"]})')
+            plate_input = group_inputs.addSelectionInput(f'plate_{idx}', f'Plate Component {idx+1}', f'Select the plate component (saved: {pair["plate"]})')
             plate_input.addSelectionFilter('Occurrences')
             plate_input.setSelectionLimits(1, 1)
-            plate_input.tooltip = f'Select the target component named: {pair["plate"]}'
+            plate_input.tooltip = f'Select the plate component named: {pair["plate"]}'
             plate_input.prompt = f'Saved: {pair["plate"]}'
             group_inputs.addTextBoxCommandInput(f'plate_name_{idx}', '', pair["plate"], 1, True)
-            text_input = group_inputs.addSelectionInput(f'text_{idx}', f'Tool Component {idx+1}', f'Select the tool component (saved: {pair["text"]})')
+            text_input = group_inputs.addSelectionInput(f'text_{idx}', f'Text Component {idx+1}', f'Select the text component (saved: {pair["text"]})')
             text_input.addSelectionFilter('Occurrences')
             text_input.setSelectionLimits(1, 1)
-            text_input.tooltip = f'Select the tool component named: {pair["text"]}'
+            text_input.tooltip = f'Select the text component named: {pair["text"]}'
             text_input.prompt = f'Saved: {pair["text"]}'
             group_inputs.addTextBoxCommandInput(f'text_name_{idx}', '', pair["text"], 1, True)
         pair_count = len(pairs) if pairs else 1
         ui.messageBox(f'Loaded {len(pairs)} pairs. Please reselect the components in the UI.')
     elif changed_input.id == 'info':
         changed_input.value = False
-        ui.messageBox('It is annoying, I know. Fusion 360 does not allow add-ins to automatically select components in the UI.\n\nYou must manually reselect the components for each pair. The saved names are shown to help you choose the correct ones.')
+        ui.messageBox('For security and user experience reasons, Fusion 360 does not allow add-ins to automatically select components in the UI.\n\nYou must manually reselect the components for each pair. The saved names are shown to help you choose the correct ones.')
     # Update text boxes when a selection changes
     if changed_input.id.startswith('plate_') or changed_input.id.startswith('text_'):
         # Find the index
