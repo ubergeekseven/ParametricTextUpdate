@@ -9,19 +9,17 @@ A Fusion 360 add-in that allows choosing components and tools for cutting operat
 
 ## Installation Instructions
 
-### Automated Installation (Recommended)
-
-#### Windows Users
+### Windows Users (Recommended)
 1. Download the latest release from the [Releases](https://github.com/yourusername/CombineCut/releases) page
 2. Extract the ZIP file
 3. Double-click `install.bat`
-4. Follow the on-screen instructions
-   - If Python is not installed, the installer will guide you through the installation process
-5. Restart Fusion 360 if it's running
-6. The add-in should appear in the Add-Ins dialog (Press Shift+S to open)
-7. Enable the add-in by checking its checkbox
+   - The installer will automatically place files in the correct location
+   - No Python or additional software required
+4. Start Fusion 360
+5. Open the Add-Ins dialog (Press Shift+S)
+6. Enable the CombineCut add-in
 
-#### Mac Users
+### Mac Users
 1. Download the latest release from the [Releases](https://github.com/yourusername/CombineCut/releases) page
 2. Extract the ZIP file
 3. Open Terminal and navigate to the extracted folder
@@ -69,7 +67,7 @@ If the add-in doesn't appear:
 3. Ensure you have the correct permissions to access the AddIns folder
 4. Try restarting Fusion 360
 5. If using the automated installer:
-   - Windows: Check if Python is installed and in your PATH
+   - Windows: Make sure Fusion 360 is closed before running the installer
    - Mac: Make sure you're using Python 3.6 or later
    - Check the console output for any error messages
 
@@ -79,15 +77,14 @@ If the add-in doesn't appear:
 ## Requirements
 - Fusion 360 (version 2.0.0 or later)
 - Windows 10/11 or macOS
-- Python 3.6 or later (for automated installation)
-  - Windows users: The installer will guide you through Python installation if needed
+- Python 3.6 or later (for Mac installation only)
 
 ## Version History
 - 1.0.0 (Current)
   - Initial release
   - Basic combine/cut functionality
   - Support for parametric text and objects
-  - Automated installation support with batch installer for Windows
+  - Simple one-click installation for Windows users
 
 ## Support
 [Add your support information here]
